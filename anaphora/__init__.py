@@ -30,12 +30,12 @@ Example:
     pd.testing.assert_frame_equal(data1, data2)
 """
 import operator as op
-from copy import copy as py_shallowcopy
 
 try:
     import cytoolz as tz
 except ImportError:
     import toolz as tz
+
 import pandas as pd
 
 
@@ -44,18 +44,8 @@ __all__ = (
     'Col',
     'with_column',
     'mutate',
-    'mutate_sequential',
-    'anaphora_options',
-    'anaphora_get_options',
-    'anaphora_set_options',
+    'mutate_sequential'
 )
-
-# heaven help me if option setting ever needs true thread-safety
-_ANAPHORA_OPTIONS_LOCKED = False
-
-_ANAPHORA_OPTIONS = {
-    'copy': True  # If True, call df.copy() in functions
-}
 
 
 def anaphora_register_methods(include=(), exclude=()):
@@ -273,7 +263,7 @@ def _apply_col(df, colname, val):
 
 def with_column(df, colname, fn, loc=None, iloc=None, copy=True):
     """ Assign a column to a DataFrame """
-    if _get_option('copy') or copy:
+    if copy:
         df = df.copy()
 
     ## Figure out subset type
@@ -313,14 +303,11 @@ def with_column(df, colname, fn, loc=None, iloc=None, copy=True):
 
 
 def _mutate_impl(df, mutations, sequential=False):
-    if _get_option('copy'):
-        df = df.copy()
-        if sequential:
-            newdf = df
-        else:
-            newdf = df.copy()  # don't allow access to other mutations
-    else:
+    df = df.copy()
+    if sequential:
         newdf = df
+    else:
+        newdf = df.copy()  # don't allow access to other mutations
 
     for name, val in mutations.items():
         newdf[name] = _apply_col(df, name, val)
@@ -351,66 +338,3 @@ def mutate_sequential(df, **mutations):
     """
     return _mutate_impl(df, mutations, sequential=True)
 
-
-## Mostly unnecessary (?) option-setting machinery
-
-def _get_option(option):
-    try:
-        return _ANAPHORA_OPTIONS[option]
-    except KeyError as exc:
-        raise _error_unknown_option(key) from exc
-
-
-def _set_options(**options):
-    if _ANAPHORA_OPTIONS_LOCKED:
-        raise RuntimeError('A lock has been acquired on _ANAPHORA_OPTIONS and must be released')
-
-    for key, value in options.items():
-        if key not in _ANAPHORA_OPTIONS:
-            raise _error_unknown_option(key)
-        _ANAPHORA_OPTIONS[key] = value
-
-
-class anaphora_options:
-    """ Context manager for temporarily setting global options
-    
-    NOT THREAD-SAFE. OR ANYTHING-SAFE. MAYBE KINDA A LITTLE BIT?
-    """
-    def __init__(self, **options):
-        self.prev_options = {}
-        self.options = options
-
-    def __enter__(self):
-        self.prev_options = py_shallowcopy(_ANAPHORA_OPTIONS)
-        _ANAPHORA_OPTIONS_LOCKED = True
-        _set_options(**self.options)
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.options = self.prev_options
-        self.prev_options = {}
-        _set_options(**self.options)
-        _ANAPHORA_OPTIONS_LOCKED = False
-
-    
-def anaphora_get_options(opt, *opts):
-    """ Get global options
-
-    NOT THREAD-SAFE. OR ANYTHING-SAFE.
-    """
-    if opt is None:
-        if opts:
-            raise TypeError()  # TODO: what the hell should this error message even be
-        return py_shallowcopy(_ANAPHORA_OPTIONS)
-
-    if opts:
-        return {option: _get_option(option) for option in (opt, *opts)}
-    else:
-        return _get_option(opt)
-
-
-def anaphora_set_options(**setoptions):
-    """ Set global options
-
-    NOT THREAD-SAFE. OR ANYTHING-SAFE.
-    """
-    _set_options(**setoptions)
