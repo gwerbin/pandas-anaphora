@@ -92,6 +92,22 @@ def test_with_column():
     expected.loc[expected.index[[1, 2]], 'z'] = df['y'].iloc[[1,2]] * 10
     pdt.assert_frame_equal(actual, expected)
 
+    # no-name shortcut
+    df = pd.DataFrame({'y': [1,2,3], 'x': [4,5,6]}, index=list('abc'))
+    assert pd.testing.assert_frame_equal(
+        with_column(df, 'y', Col('y') * 10, iloc=[1, 2]),
+        with_column(df, 'y',    Col() * 10, iloc=[1, 2])
+    )
+    with pytest.raises(KeyError) as exc_info:
+        with_column(df, 'z', Col() * 10, iloc=[1, 2])
+    assert str(exc_info.value) == 'z'
+
+    # don't mutate original
+    df = pd.DataFrame({'y': [1,2,3], 'x': [4,5,6]}, index=list('abc'))
+    df2 = with_column(df, 'y', Col('y') * 10, iloc=[1, 2]),
+    with pytest.raises(AssertionError):
+        pd.testing.assert_frame_equal(df, df2)
+
 
 def test_mutate():
     from anaphora import Col, mutate, mutate_sequential
