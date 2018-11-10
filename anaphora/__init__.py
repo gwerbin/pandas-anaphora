@@ -24,8 +24,8 @@ Example:
     # the new way
     data2 = data1\
         .with_column('x', Col('b') > 4)\
-        .with_column('a', 300, subset=Col() == 3)\
-        .with_column('b', -Col(), at='this')
+        .with_column('a', 300, loc=Col() == 3)\
+        .with_column('b', -Col('b').loc['this'])
 
     pd.testing.assert_frame_equal(data1, data2)
 """
@@ -200,6 +200,19 @@ class Col(metaclass=ColType):
             add_one_to_y(data)
         )
     """
+    class SeriesIndexer(ColType.GetterPusher):
+        # Special case for loc/iloc -- analogous to ColType.SeriesMethod
+        def __getitem__(self, *args):
+            def get_index(x):
+                return getattr(x, self.name)[args]
+            self.col.push(get_index)
+            return self.col
+
+        # TODO: what should __setitem__ semantics be, if any? Could be relevant w/ expressiona-assignemnt := syntax
+
+    loc = SeriesIndexer()
+    iloc = SeriesIndexer()
+
     class _MethodArgCollector:
         # Collects method args and pushes them onto the fn stack
         # __getattr__ has to return something 1) callable and 2) connected to Col
@@ -241,7 +254,13 @@ class Col(metaclass=ColType):
         self.fns.append(fn)
 
     def compute(self, df):
-        col = df.loc[:, self.spec]
+        if isinstance(df, pd.Series):
+            # Col() is NOT MEANT TO BE USED DIRECTLY ON SERIES -- IT IS NOT TESTED OR SUPPORTED
+            # This is only here to support the case of scalar loc/iloc access in with_column
+            # TODO: find a better solution
+            col = df.loc[self.spec]
+        else:
+            col = df.loc[:, self.spec]
         if not self.fns:
             return col
         return tz.compose(*reversed(self.fns))(col)
@@ -255,7 +274,7 @@ class Col(metaclass=ColType):
 def _apply_col(df, colname, val):
     if callable(val):
         if isinstance(val, Col) and val.spec is None:
-            val = Col(colname)
+            val.spec = colname
         return val(df)
     else:
         return val
@@ -286,18 +305,17 @@ def with_column(df, colname, fn, loc=None, iloc=None, copy=True):
     subset_type = subset_types_given[0]
     subset_value = subset_types[subset_type]
 
-    ## Resolve subset
+    ## Resolve subset and fn
 
     subset_value = _apply_col(df, colname, subset_value)
-    df_subset = getattr(df, subset_type)[subset_value]
+    #if pd.api.types.is_scalar(subset_value):
+        #subset_value = [subset_value]
+        # subsetting a dataframe 
 
-    ## Resolve fn
-
-    # old version of pandas used to complain when you set a value on a slice/subset,
-    # not sure when they removed that behavior
-    value = _apply_col(df, colname, fn)
-    df_subset[colname] = value
-    # FIXME !! this won't work if colname isn't already a column in df !!
+    if subset_type == 'loc':
+        df.loc[subset_value, colname] = _apply_col(df.loc[subset_value], colname, fn)
+    else:
+        df.loc[df.index[subset_value], colname] = _apply_col(df.iloc[subset_value], colname, fn)
 
     return df
 
