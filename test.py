@@ -48,11 +48,11 @@ def test_mutate():
 
     df = pd.DataFrame({'y': [1,2,3], 'x': [4,5,6]})
     expected = pd.DataFrame({'y': [0,1,2], 'x': [5,6,7]})
-    actual = mutate(df, y=Col('x')-1, z=('y')+1)
+    actual = mutate(df, y=Col('x')-1, z=Col('y')+1)
 
     df = pd.DataFrame({'y': [1,2,3], 'x': [4,5,6]})
     expected = pd.DataFrame({'y': [0,1,2], 'x': [1,2,3]})
-    actual = mutate(df, y=Col('x')-1, z=('y')+1)
+    actual = mutate(df, y=Col('x')-1, z=Col('y')+1)
 
     df = pd.DataFrame({'y': [1,2,3], 'x': [4,5,6]})
     expected = df
