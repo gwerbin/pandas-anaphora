@@ -274,6 +274,8 @@ class Col(metaclass=ColType):
 def _apply_col(df, colname, val):
     if callable(val):
         if isinstance(val, Col) and val.spec is None:
+            if colname not in df.columns:
+                raise KeyError(colname)
             val.spec = colname
         return val(df)
     else:
