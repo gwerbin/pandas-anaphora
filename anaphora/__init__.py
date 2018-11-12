@@ -48,16 +48,21 @@ __all__ = (
 )
 
 
-def anaphora_register_methods(include=(), exclude=()):
+def anaphora_register_methods(include=(), exclude=(), cls=None):
     """ Register functions as Pandas object methods
 
     Registered methods:
     - anaphora.with_column -> pandas.DataFrame.with_column
     - anaphora.mutate -> pandas.DataFrame.mutate
+    - anaphora.mutate_sequential -> pandas.DataFrame.mutate_sequential
     """
+    if cls is None:
+        cls = pd.DataFrame
+
     methods = {
         'with_column': with_column,
-        'mutate': mutate
+        'mutate': mutate,
+        'mutate_sequential': mutate_sequential
     }
 
     if not include:
@@ -67,7 +72,7 @@ def anaphora_register_methods(include=(), exclude=()):
 
     for name, method in methods.items():
         if name in whitelist:
-            setattr(pd.DataFrame, name, method)
+            setattr(cls, name, method)
 
 
 ## Standardized error messages
@@ -254,6 +259,9 @@ class Col(metaclass=ColType):
         self.fns.append(fn)
 
     def compute(self, df):
+        if self.spec is None:
+            raise ValueError("No column specification - un-specified Col objects cannot be used on their own"
+
         if isinstance(df, pd.Series):
             # Col() is NOT MEANT TO BE USED DIRECTLY ON SERIES -- IT IS NOT TESTED OR SUPPORTED
             # This is only here to support the case of scalar loc/iloc access in with_column
@@ -275,7 +283,8 @@ def _apply_col(df, colname, val):
     if callable(val):
         if isinstance(val, Col) and val.spec is None:
             if colname not in df.columns:
-                raise KeyError(colname)
+                raise KeyError("This Col object has no column specification, but the column it is being assigned "
+                               "to ({!r}) does not already exist in the data frame.".format(colname))
             val.spec = colname
         return val(df)
     else:
@@ -312,7 +321,6 @@ def with_column(df, colname, fn, loc=None, iloc=None, copy=True):
     subset_value = _apply_col(df, colname, subset_value)
     #if pd.api.types.is_scalar(subset_value):
         #subset_value = [subset_value]
-        # subsetting a dataframe 
 
     if subset_type == 'loc':
         df.loc[subset_value, colname] = _apply_col(df.loc[subset_value], colname, fn)
@@ -357,4 +365,54 @@ def mutate_sequential(df, **mutations):
         mutate(df, x=Col('y')*10, y=Col('x')+1)
     """
     return _mutate_impl(df, mutations, sequential=True)
+
+
+
+## Experimental, generic "UDF-like" wrapper
+
+# TODO: minimum viable + tests
+
+class Anaphoric:
+    def __init__(self, func, posargs=None, kwargs=None):
+        self.func = func
+        self.posargs = posargs or ()
+        self.kwargs = kwargs or ()
+
+    def __call__(self, *args, **kwargs):
+        for i, arg in enumerate(args):
+            if i not in self.posargs:
+                continue
+            if not isinstance(arg, Col):
+                # TODO: make this optional
+                raise TypeError('Positional argument {} should be a Col object'.format(i))
+            # ...
+        for k, arg in kwargs.items():
+            if k not in self.kwargs:
+                continue
+            if not isinstance(arg, Col):
+                # TODO: make this optional
+                raise TypeError('Keyword argument {} should be a Col object'.format(k))
+            # ...
+
+
+# TODO: can we eliminate the "spec" thing entirely?
+def as_anaphoric(func, *args):
+    posargs = []
+    kwargs = []
+    for arg in args:
+        if isinstance(arg, str):
+            posargs.append(arg)
+        elif isinstance(arg, int) and arg >= 0:
+            kwargs.append(arg)
+        else:
+            ValueError("Args must be strings or positive integers")
+
+
+# decorator version
+def anaphoric(*args):
+    def decorator(func):
+        @wraps(func)
+        return as_anaphoric(func, *args)
+    return decorator
+
 
