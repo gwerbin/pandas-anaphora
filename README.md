@@ -20,7 +20,7 @@ Let's say you want to do the following operations:
 
 1. Create a new column `"x"` that is equal to `"a"` when `"b"` is greater than 4, and null otherwise
 2. When column `"a"` is 3, replace it with 300.
-3. At the index `"this"`, replace the the value of column `"b"` with its negative
+3. Replace the whole column `"b"` with the negative of `"b"` at the row index `"this"`.
 
 This is how you might do it in typical Pandas code:
 
@@ -44,7 +44,6 @@ data = data\
 ```
 
 In my opinion, the latter is easier to read, and easier to write in an interactive session like a Jupyter notebook.
-
 
 # Installation
 
