@@ -10,7 +10,7 @@ With this setup:
 
 ```python
 import pandas as pd
-from pandas_anaphora import register_anaphora, Col
+from pandas_anaphora import register_anaphora_methods, Col
 register_anaphora_methods()
 
 data = pd.DataFrame({'a': [1,2,3], 'b': [4,5,6]}, index=['this', 'that', 'other'])
