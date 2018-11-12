@@ -39,7 +39,7 @@ And this is how you would do it with Anaphora:
 ```python
 data = data\
     .with_column('x', Col('a'), Col('b') > 4)\
-    .with_column('a', 300, loc=Col() == 3)\
+    .with_column('a', 300, Col() == 3)\
     .with_column('b', -Col('b').loc['this'])
 ```
 
