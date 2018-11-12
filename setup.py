@@ -7,7 +7,7 @@ setup(
     description='Anaphoric functions for columns in Pandas data frames',
     url='https://github.com/gwerbin/pandas-anaphora',
     license='MIT',
-    version='1.0b0',
+    version='0.1b0',
     packages=find_packages('.', exclude=['test', 'test.*', 'tests', 'tests.*']),
     python_requires='>= 3.4',
     install_requires=['setuptools', 'pandas>=0.20', 'toolz>=0.9'],  # cytoolz>=0.9
